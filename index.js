@@ -11,15 +11,23 @@ async function fetchUsdtTradingPairsWithBBands() {
       const interval = setInterval(async () => {
         if (index >= symbolsAndPrices.length) {
           clearInterval(interval);
-          console.log(finalArray);
+          const finalResults = (finalArray.sort((a, b) => parseFloat(a.diff) - parseFloat(b.diff))).slice(0,5);
+          console.log("Updated Top Results ", finalResults);
           return;
         }
         const { symbol, price } = symbolsAndPrices[index];
         const bbands = await getBBandsForSymbol(symbol);
-        bbands?finalArray.push({ symbol, price, bbands }):null;
+        if (bbands && (symbol!="LINKUPUSDT" || symbol!="ETHUPUSDT" || symbol!="ADAUPUSDT" || symbol!="BNBUPUSDT" || symbol!="BTCUPUSDT")) {
+            const difference = price - bbands;
+            const diff = ((difference / bbands) * 100).toFixed(3);  //Percentage Difference
+            finalArray.push({ symbol, diff })
+            // console.log(symbolsAndPrices.length-index, " ", { symbol, price, bbands, percentageDifference })
+            console.log(symbolsAndPrices.length-index, " sec")
+          }
+        
         index += 1;
-        console.log(symbolsAndPrices.length-index, " ", { symbol, price, bbands })
-      }, 1000);
+        
+      }, 550);
     } catch (error) {
       console.error(error);
     }
