@@ -70,7 +70,9 @@ async function fetchUsdtTradingPairsWithBBands() {
                 pair.symbol !== "BZRXUSDT" &&
                 pair.symbol !== "EOSDOWNUSDT" &&
                 pair.symbol !== "NPXSUSDT" &&
-                pair.symbol !== "STRATUSDT"
+                pair.symbol !== "STRATUSDT" &&
+                pair.symbol !== "MFTUSDT" &&
+                pair.symbol !== "XZCUSDT"
             );
         });
         console.log("MMY: symbolsAndPrices", symbolsAndPrices);
