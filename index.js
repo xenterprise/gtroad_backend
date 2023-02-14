@@ -8,7 +8,8 @@ const taapiKey =
 const taapi = new Taapi.default(taapiKey);
 let operationalCount = 0;
 let finalArray = [];
-let finalResults = [];
+let finalBbands = [];
+let finalRsi = [];
 app.use(cors());
 app.listen(process.env.PORT || 3000, () => {});
 app.get("/data", (req, res) => {
@@ -16,7 +17,7 @@ app.get("/data", (req, res) => {
 });
 let intervalId;
 
-async function fetchUsdtTradingPairsWithBBands() {
+async function fetchUsdtPairsWithIndicatorsData() {
     try {
         const response = await axios.get("https://api.binance.com/api/v3/ticker/price");
         console.log("MMY: symbolsAndPrices1", response.data);
@@ -72,44 +73,84 @@ async function fetchUsdtTradingPairsWithBBands() {
                 pair.symbol !== "NPXSUSDT" &&
                 pair.symbol !== "STRATUSDT" &&
                 pair.symbol !== "MFTUSDT" &&
-                pair.symbol !== "XZCUSDT"
+                pair.symbol !== "XZCUSDT" &&
+                pair.symbol !== "GXSUSDT" &&
+                pair.symbol !== "1INCHUPUSDT" &&
+                pair.symbol !== "1INCHDOWNUSDT" &&
+                pair.symbol !== "EPSUSDT" &&
+                pair.symbol !== "RAMPUSDT"&&
+                pair.symbol !== "XLMUPUSDT" &&
+                pair.symbol !== "XLMDOWNUSDT"&&
+                pair.symbol !== "SUSHIUPUSDT" &&
+                pair.symbol !== "SUSHIDOWNUSDT" &&
+                pair.symbol !== "SUSDUSDT" &&
+                pair.symbol !== "AAVEUPUSDT" &&
+                pair.symbol !== "AAVEDOWNUSDT" &&
+                pair.symbol !== "BCHUPUSDT" &&
+                pair.symbol !== "BCHDOWNUSDT" &&
+                pair.symbol !== "YFIUPUSDT" &&
+                pair.symbol !== "YFIDOWNUSDT" &&
+                pair.symbol !== "FILUPUSDT" &&
+                pair.symbol !== "FILDOWNUSDT" &&
+                pair.symbol !== "SXPUPUSDT" &&
+                pair.symbol !== "SXPDOWNUSDT"&&
+                pair.symbol !== "DAIUSDT"&&
+                pair.symbol !== "USTUSDT"&&
+                pair.symbol !== "ANYUSDT"&&
+                pair.symbol !== "RGTUSDT"&&
+                pair.symbol !== "KEEPUSDT"&&
+                pair.symbol !== "UNIDOWNUSDT"&&
+                pair.symbol !== "UNIUPUSDT"&&
+                pair.symbol !== "LTCDOWNUSDT"&&
+                pair.symbol !== "LTCUPUSDT"&&
+                pair.symbol !== "NUUSDT"&&
+                pair.symbol !== "BTCSTUSDT"&&
+                pair.symbol !== "ADADOWNUSDT"&&
+                pair.symbol !== "ADAUPUSDT"&&
+                pair.symbol !== "ETHDOWNUSDT"&&
+                pair.symbol !== "ETHUPUSDT"&&
+                pair.symbol !== "BTCDOWNUSDT"&&
+                pair.symbol !== "BTCUPUSDT"&&
+                pair.symbol !== "LINKDOWNUSDT"&&
+                pair.symbol !== "LINKUPUSDT"&&
+                pair.symbol !== "XRPDOWNUSDT"&&
+                pair.symbol !== "XRPUPUSDT"
             );
         });
         console.log("MMY: symbolsAndPrices", symbolsAndPrices);
-        finalArray = [];
+        
         let index = 0;
         intervalId = setInterval(async () => {
             if (index >= symbolsAndPrices.length) {
                 clearInterval(intervalId);
-                finalResults = finalArray.sort((a, b) => parseFloat(a.diff) - parseFloat(b.diff)).slice(0, 5);
-                console.log("Updated Top Results ", finalResults);
+                finalBbands = finalArray.sort((a, b) => parseFloat(a.diff) - parseFloat(b.diff)).slice(0, 10);
+                finalRsi = finalArray.sort((a,b)=>parseFloat(a.rsi) - parseFloat(b.rsi)).slice(0, 10);
+                console.log("Updated Negative Bbands ", finalBbands);
+                console.log("Updated Negative RSI ", finalRsi);
                 return;
             }
             const { symbol, price } = symbolsAndPrices[index];
-            const bbands = await getBBandsForSymbol(symbol);
-            console.log();
-            // if (
-            //     bbands &&
-            //     (symbol != "LINKUPUSDT" ||
-            //         symbol != "ETHUPUSDT" ||
-            //         symbol != "ADAUPUSDT" ||
-            //         symbol != "BNBUPUSDT" ||
-            //         symbol != "BTCUPUSDT")
-            // ) {
-            //     const difference = price - bbands;
-            //     const diff = ((difference / bbands) * 100).toFixed(3); //Percentage Difference
-            //     finalArray.push({ symbol, diff });
-            //     console.log(symbolsAndPrices.length - index, " sec");
-            // }
+            const dataValues = await getIndicatorsData(symbol);
+           
+            if (dataValues.bbands) {
+                const {bbands, rsi} = dataValues;
+                console.log("MMY Data: ",symbolsAndPrices.length - index,  symbol, dataValues)
+                const difference = price - bbands;
+                const diff = ((difference / bbands) * 100).toFixed(3); //Percentage Difference
+               
+                finalArray.push({ symbol, diff, rsi });
+                // console.log(symbolsAndPrices.length - index, " sec");
+            }
 
             index += 1;
-        }, 1500);
+        }, 550);
     } catch (error) {
         console.error(error);
     }
 }
 
-async function getBBandsForSymbol(symbol) {
+async function getIndicatorsData(symbol) {
+    let data = {}
     try {
         // const response = await taapi.getIndicator("bbands2", `${symbol}`, "5m");
         // return response.valueMiddleBand;
@@ -132,23 +173,26 @@ async function getBBandsForSymbol(symbol) {
                 },
             })
             .then((response) => {
-                console.log("Response : ", response.data.data);
+                // console.log("Response : ", response.data.data);
+                // console.log("Response: ", response.data.data[0].result.valueMiddleBand, response.data.data[1].result.value)
+                data= {bbands: response.data.data[0].result.valueMiddleBand.toFixed(3), rsi: response.data.data[1].result.value.toFixed(0)}
+                
             })
             .catch((error) => {
                 console.error(error);
-                clearInterval(intervalId);
             });
+            return data;
     } catch (error) {
         return false;
     }
 }
 
-fetchUsdtTradingPairsWithBBands();
+fetchUsdtPairsWithIndicatorsData();
 setInterval(() => {
     try {
         console.log("Iteration Count: ", operationalCount++);
         clearInterval(intervalId);
-        fetchUsdtTradingPairsWithBBands();
+        fetchUsdtPairsWithIndicatorsData();
     } catch (e) {
         console.log("Error: ", e);
     }
