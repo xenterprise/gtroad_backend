@@ -8,8 +8,14 @@ const taapiKey =
 const taapi = new Taapi.default(taapiKey);
 let operationalCount = 0;
 let finalArray = [];
-let finalBbands = [];
-let finalRsi = [];
+let finalLowBbands = [];
+let finalLowRsi = [];
+let finalHighBbands = [];
+let finalHighRsi = [];
+
+let finalHighVWap = [];
+let finalLowVWap = [];
+
 let symbolsIndex = -1;
 app.use(cors());
 app.listen(process.env.PORT || 3000, () => {});
@@ -132,7 +138,10 @@ async function fetchUsdtPairsWithIndicatorsData() {
                 pair.symbol !== "USDPUSDT" &&
                 pair.symbol !== "TORNUSDT" &&
                 pair.symbol !== "TORNUSDT" &&
-                pair.symbol !== "TORNUSDT"
+                pair.symbol !== "TORNUSDT" &&
+                pair.symbol !== "KEYUSDT" &&
+                pair.symbol !== "BNXUSDT" &&
+                pair.symbol !== "BNBDOWNUSDT"
             );
         });
         symbolsIndex = 0;
@@ -142,26 +151,45 @@ async function fetchUsdtPairsWithIndicatorsData() {
                 const uniqueFinalArray = finalArray.filter(
                     (obj, index, self) => index === self.findIndex((o) => o.symbol === obj.symbol)
                 );
-                finalBbands = uniqueFinalArray.sort((a, b) => parseFloat(a.diff) - parseFloat(b.diff)).slice(0, 5);
-                finalRsi = uniqueFinalArray.sort((a, b) => parseFloat(a.rsi) - parseFloat(b.rsi)).slice(0, 5);
-                console.log("Unique Array: ", uniqueFinalArray);
-                console.log("Updated Negative Bbands ", finalBbands);
-                console.log("Updated Negative RSI ", finalRsi);
+                finalLowBbands = uniqueFinalArray.sort((a, b) => parseFloat(a.diff) - parseFloat(b.diff)).slice(0, 5);
+                finalLowRsi = uniqueFinalArray.sort((a, b) => parseFloat(a.rsi) - parseFloat(b.rsi)).slice(0, 5);
+                finalHighBbands = uniqueFinalArray.sort((a, b) => parseFloat(b.diff) - parseFloat(a.diff)).slice(0, 5);
+                finalHighRsi = uniqueFinalArray.sort((a, b) => parseFloat(b.rsi) - parseFloat(a.rsi)).slice(0, 5);
+                //vWap
+                finalLowVWap = uniqueFinalArray
+                    .sort((a, b) => parseFloat(a.vWapDiff) - parseFloat(b.vWapDiff))
+                    .slice(0, 5);
+                finalHighVWap = uniqueFinalArray
+                    .sort((a, b) => parseFloat(b.vWapDiff) - parseFloat(a.vWapDiff))
+                    .slice(0, 5);
+
+                console.clear();
+                // console.log("Unique Array: ", uniqueFinalArray);
+                console.log("Negative Bbands ", finalLowBbands);
+                console.log("Positive Bbands ", finalHighBbands);
+                console.log("Negative RSI ", finalLowRsi);
+                console.log("Positive RSI ", finalHighRsi);
+                console.log("Negative vWap ", finalLowVWap);
+                console.log("Positive vWap ", finalHighVWap);
                 return;
             }
-            const { symbol, price } = symbolsAndPrices[symbolsIndex];
+            const { symbol } = symbolsAndPrices[symbolsIndex];
             const dataValues = await getIndicatorsData(symbol);
             if (dataValues.bbands) {
-                const { bbands, rsi } = dataValues;
+                const { bbands, rsi, vwap, price } = dataValues;
                 const difference = price - bbands;
                 const diff = ((difference / bbands) * 100).toFixed(3); //Percentage Difference
-                finalArray.push({ symbol, diff, rsi });
-            }
 
+                const vWapDifference = price - vwap;
+                const vWapDiff = ((vWapDifference / vwap) * 100).toFixed(3); //vWap Percentage Difference
+
+                finalArray.push({ symbol, diff, rsi, vWapDiff });
+            }
+            // console.log(symbolsAndPrices.length - symbolsIndex);
             symbolsIndex += 1;
-        }, 550);
+        }, 1000);
     } catch (error) {
-        console.error(error);
+        console.error("Error Occured: ", error.code);
     }
 }
 
@@ -182,13 +210,22 @@ async function getIndicatorsData(symbol) {
                         {
                             indicator: "rsi",
                         },
+                        {
+                            indicator: "vwap",
+                        },
+                        {
+                            indicator: "candle",
+                        },
                     ],
                 },
             })
             .then((response) => {
+                // console.log("Price: ", response.data.data);
                 data = {
                     bbands: response.data.data[0].result.valueMiddleBand,
                     rsi: response.data.data[1].result.value.toFixed(0),
+                    vwap: response.data.data[2].result.value,
+                    price: response.data.data[3].result.close,
                 };
             })
             .catch((error) => {
@@ -208,10 +245,15 @@ setInterval(() => {
         clearInterval(intervalId);
         finalArray = [];
         symbolsIndex = 0;
-        finalBbands = [];
-        finalRsi = [];
+        finalLowBbands = [];
+        finalLowRsi = [];
+        finalHighBbands = [];
+        finalHighRsi = [];
+        let finalHighVWap = [];
+        let finalLowVWap = [];
+
         fetchUsdtPairsWithIndicatorsData();
     } catch (e) {
         console.log("Error: ", e);
     }
-}, 250000);
+}, 320000);
