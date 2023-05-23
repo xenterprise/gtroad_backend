@@ -3,20 +3,13 @@ const app = express();
 const cors = require("cors");
 const Taapi = require("taapi");
 const axios = require("axios");
+app.use(express.json());
 const taapiKey =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbHVlIjoiNjAzMzU3ODZmZTBhZjZjNmJlOWQ0N2IxIiwiaWF0IjoxNjc1OTY3NTcyLCJleHAiOjMzMTgwNDMxNTcyfQ.IxngA8XZZbYdlWJWEI05jUv0cFwW6FDbjxn1uxdORLc";
 const taapi = new Taapi.default(taapiKey);
-let uniqueFinalArray = [];
-let operationalCount = 0;
 let finalArray = [];
-let finalLowBbands = [];
-let finalLowRsi = [];
-let finalHighBbands = [];
-let finalHighRsi = [];
-
-let finalHighMA = [];
-let finalLowMA = [];
-let finalPipeMA = [];
+let uniqueFinalArray = [];
+let count = 0;
 
 let symbolsIndex = -1;
 app.use(cors());
@@ -27,6 +20,7 @@ app.get("/data", (req, res) => {
 app.get("/test", (req, res) => {
     res.status(200).json("Hello Test Call");
 });
+
 let intervalId;
 
 async function fetchUsdtPairsWithIndicatorsData() {
@@ -155,41 +149,16 @@ async function fetchUsdtPairsWithIndicatorsData() {
         });
         symbolsIndex = 0;
         intervalId = setInterval(async () => {
+            console.log("Inner Loop:", symbolsAndPrices.length, count++);
+
             if (symbolsIndex >= symbolsAndPrices.length) {
                 clearInterval(intervalId);
+                console.log("Internal Loop Cleared");
+                uniqueFinalArray = [];
                 uniqueFinalArray = finalArray.filter(
                     (obj, index, self) => index === self.findIndex((o) => o.symbol === obj.symbol)
                 );
-                finalLowBbands = uniqueFinalArray.sort((a, b) => parseFloat(a.diff) - parseFloat(b.diff)).slice(0, 5);
-                finalLowRsi = uniqueFinalArray.sort((a, b) => parseFloat(a.rsi) - parseFloat(b.rsi)).slice(0, 5);
-                finalHighBbands = uniqueFinalArray.sort((a, b) => parseFloat(b.diff) - parseFloat(a.diff)).slice(0, 5);
-                finalHighRsi = uniqueFinalArray.sort((a, b) => parseFloat(b.rsi) - parseFloat(a.rsi)).slice(0, 5);
-                //MA
-                finalLowMA = uniqueFinalArray.sort((a, b) => parseFloat(a.diffMA) - parseFloat(b.diffMA)).slice(0, 5);
-                finalHighMA = uniqueFinalArray.sort((a, b) => parseFloat(b.diffMA) - parseFloat(a.diffMA)).slice(0, 5);
 
-                const absoluteArray = uniqueFinalArray
-                    .map(Math.abs)
-                    .sort((a, b) => parseFloat(a.diffMA) - parseFloat(b.diffMA));
-                const zeroIndex = uniqueFinalArray.indexOf(absoluteArray[0]);
-                // const lowerBound = Math.max(0, zeroIndex - 5);
-                // const upperBound = Math.min(uniqueFinalArray.length, zeroIndex + 6);
-                const finalPipeMA = uniqueFinalArray.slice(zeroIndex - 5, zeroIndex + 5);
-
-                // finalPipeMA = uniqueFinalArray
-                //     .sort((a, b) => parseFloat(a.diffMA) - parseFloat(b.diffMA))
-                //     .slice(symbolsAndPrices.length / 2 - 5, symbolsAndPrices.length / 2 + 5);
-
-                console.clear();
-                // console.log("Unique Array: ", uniqueFinalArray);
-                console.log("Negative Bbands ", finalLowBbands);
-                // console.log("Positive Bbands ", finalHighBbands);
-                console.log("Negative RSI ", finalLowRsi);
-                // console.log("Positive RSI ", finalHighRsi);
-
-                console.log("Negative MA ", finalLowMA);
-                console.log("Positive MA ", finalHighMA);
-                console.log("PIPE MA ", finalPipeMA);
                 return;
             }
             const { symbol } = symbolsAndPrices[symbolsIndex];
@@ -204,19 +173,16 @@ async function fetchUsdtPairsWithIndicatorsData() {
                 const differenceMA = price - ma;
                 const diffMA = ((differenceMA / ma) * 100).toFixed(3); //Percentage Difference
 
-                // const vWapDifference = price - vwap;
-                // const vWapDiff = ((vWapDifference / vwap) * 100).toFixed(3); //vWap Percentage Difference
-
-                // finalArray.push({ symbol, diff, rsi, vWapDiff, vwap, price });
                 finalArray.push({ symbol, diff, rsi, diffMA });
+                // uniqueFinalArray = finalArray.filter(
+                //     (obj, index, self) => index === self.findIndex((o) => o.symbol === obj.symbol)
+                // );
             }
-            console.log(symbolsAndPrices.length - symbolsIndex);
-            // console.log(finalArray);
+            // console.log(symbolsAndPrices.length - symbolsIndex);
+
             symbolsIndex += 1;
         }, 1000);
-    } catch (error) {
-        console.error("Error Occured: ", error.code);
-    }
+    } catch (error) {}
 }
 
 async function getIndicatorsData(symbol) {
@@ -247,7 +213,6 @@ async function getIndicatorsData(symbol) {
                 },
             })
             .then((response) => {
-                // console.log("Price: ", response.data.data);
                 data = {
                     bbands: response.data.data[0].result.valueMiddleBand,
                     rsi: response.data.data[1].result.value.toFixed(0),
@@ -255,10 +220,7 @@ async function getIndicatorsData(symbol) {
                     price: response.data.data[3].result.close,
                 };
             })
-            .catch((error) => {
-                console.error(error);
-                // console.log("Current Data: ", symbol, response);
-            });
+            .catch((error) => {});
         return data;
     } catch (error) {
         return false;
@@ -267,20 +229,12 @@ async function getIndicatorsData(symbol) {
 
 fetchUsdtPairsWithIndicatorsData();
 setInterval(() => {
+    console.log("Outier Loop Started");
     try {
-        console.log("Iteration Count: ", operationalCount++);
-        clearInterval(intervalId);
+        // clearInterval(intervalId);
         finalArray = [];
         symbolsIndex = 0;
-        finalLowBbands = [];
-        finalLowRsi = [];
-        finalHighBbands = [];
-        finalHighRsi = [];
-        finalHighMA = [];
-        finalLowMA = [];
-
+        console.log("Outer Loop:", count++);
         fetchUsdtPairsWithIndicatorsData();
-    } catch (e) {
-        console.log("Error: ", e);
-    }
+    } catch (e) {}
 }, 500000);
