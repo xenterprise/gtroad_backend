@@ -3,13 +3,20 @@ const app = express();
 const cors = require("cors");
 const Taapi = require("taapi");
 const axios = require("axios");
+const tickersList = require("./tickers");
+//⚪ DEV
 app.use(express.json());
+// console.log("Tickers: ", tickersList);
 const taapiKey =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbHVlIjoiNjAzMzU3ODZmZTBhZjZjNmJlOWQ0N2IxIiwiaWF0IjoxNjc1OTY3NTcyLCJleHAiOjMzMTgwNDMxNTcyfQ.IxngA8XZZbYdlWJWEI05jUv0cFwW6FDbjxn1uxdORLc";
 const taapi = new Taapi.default(taapiKey);
 let finalArray = [];
 let uniqueFinalArray = [];
 let count = 0;
+const accountSid = "AC9f8ef1603a8ec0aaf6674b00b83ed3ed";
+const authToken = "bc9bf82d06aafde6a999c28c40f8958c";
+const client = require("twilio")(accountSid, authToken);
+const timeStamps = {};
 
 let symbolsIndex = -1;
 app.use(cors());
@@ -20,13 +27,61 @@ app.get("/data", (req, res) => {
 app.get("/test", (req, res) => {
     res.status(200).json("Hello Test Call");
 });
+// app.get("/tick", (req, res) => {
+//     let response = {};
 
+//     async function fetchData() {
+//         try {
+//             response = await axios.get("https://api.binance.com/api/v3/ticker/price");
+//             // Process the response data
+//             //console.log("Response: ", response.data);
+//             res.status(200).json(response.data);
+//         } catch (error) {
+//             // Handle errors
+//             //console.error(error);
+//         }
+//     }
+
+//     fetchData();
+// });
+app.get("/todo", (req, res) => {
+    let response = {};
+
+    async function fetchData() {
+        try {
+            response = await axios.get("https://jsonplaceholder.typicode.com/todos/1");
+            // Process the response data
+            //console.log("Response: ", response.data);
+            res.status(200).json(response.data);
+        } catch (error) {
+            // Handle errors
+            // console.error(error);
+        }
+    }
+
+    fetchData();
+});
 let intervalId;
+
+function sendNotification(symbol, diffMA) {
+    //Send Notification
+    client.messages
+        .create({
+            from: "whatsapp:+14155238886",
+            body: `${symbol} ${diffMA > 0 ? "🟢" : "🔴"} ${diffMA}!`,
+            to: "whatsapp:+923359123993",
+        })
+        .then((message) => {
+            // console.log(message.sid);
+        });
+    timeStamps[symbol] = new Date();
+}
 
 async function fetchUsdtPairsWithIndicatorsData() {
     try {
-        const response = await axios.get("https://api.binance.com/api/v3/ticker/price");
-        const symbolsAndPrices = response.data.filter((pair) => {
+        // const response = await axios.get("https://api.binance.com/api/v3/ticker/price");
+        // let response = tickersList;
+        const symbolsAndPrices = tickersList.filter((pair) => {
             return (
                 pair.symbol.endsWith("USDT") &&
                 pair.symbol !== "USDCUSDT" &&
@@ -149,11 +204,11 @@ async function fetchUsdtPairsWithIndicatorsData() {
         });
         symbolsIndex = 0;
         intervalId = setInterval(async () => {
-            console.log("Inner Loop:", symbolsAndPrices.length, count++);
+            //console.log("Inner Loop:", symbolsAndPrices.length, count++);
 
             if (symbolsIndex >= symbolsAndPrices.length) {
                 clearInterval(intervalId);
-                console.log("Internal Loop Cleared");
+                // console.log("Internal Loop Cleared");
                 uniqueFinalArray = [];
                 uniqueFinalArray = finalArray.filter(
                     (obj, index, self) => index === self.findIndex((o) => o.symbol === obj.symbol)
@@ -172,6 +227,27 @@ async function fetchUsdtPairsWithIndicatorsData() {
 
                 const differenceMA = price - ma;
                 const diffMA = ((differenceMA / ma) * 100).toFixed(3); //Percentage Difference
+
+                if (diffMA > 15 || diffMA < -15) {
+                    const currentDateTime = new Date(); //Get current Date
+                    // Calculate the time difference in milliseconds
+                    let timeDifference = 0;
+                    if (timeStamps[symbol]) {
+                        timeDifference = currentDateTime.getTime() - timeStamps[symbol].getTime();
+                        if (timeDifference > 1 * 60 * 60 * 1000) {
+                            sendNotification(symbol, diffMA);
+                        }
+                        // console.log(
+                        //     "Time Difference: ",
+                        //     currentDateTime.getTime(),
+                        //     timeStamps[symbol].getTime(),
+                        //     timeDifference,
+                        //     symbol
+                        // );
+                    } else {
+                        sendNotification(symbol, diffMA);
+                    }
+                }
 
                 finalArray.push({ symbol, diff, rsi, diffMA });
                 // uniqueFinalArray = finalArray.filter(
@@ -229,12 +305,12 @@ async function getIndicatorsData(symbol) {
 
 fetchUsdtPairsWithIndicatorsData();
 setInterval(() => {
-    console.log("Outier Loop Started");
+    // console.log("Outier Loop Started");
     try {
         // clearInterval(intervalId);
         finalArray = [];
         symbolsIndex = 0;
-        console.log("Outer Loop:", count++);
+        // console.log("Outer Loop:", count++);
         fetchUsdtPairsWithIndicatorsData();
     } catch (e) {}
 }, 500000);
